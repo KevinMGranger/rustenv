@@ -248,6 +248,7 @@ dependencies = [
  "change-case",
  "clap",
  "dotenvy",
+ "is-terminal",
  "serde",
  "serde_dhall",
 ]

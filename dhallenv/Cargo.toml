@@ -8,5 +8,6 @@ anyhow = "1.0.58"
 change-case = "0.2.0"
 clap = { version = "3.2.8", features = ["derive"] }
 dotenvy = "0.15.1"
+is-terminal = "0.3.0"
 serde = { version = "1.0.137"}
 serde_dhall = { version = "0.11.2", default-features = false }
