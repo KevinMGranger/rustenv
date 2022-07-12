@@ -248,7 +248,6 @@ dependencies = [
  "change-case",
  "clap",
  "dotenvy",
- "is-terminal",
  "serde",
  "serde_dhall",
 ]
@@ -356,6 +355,16 @@ checksum = "ae91abf6555234338687bb47913978d275539235fcb77ba9863b779090b42b14"
 dependencies = [
  "bit-set",
  "regex",
+]
+
+[[package]]
+name = "fishdotenv"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dotenvy",
+ "is-terminal",
 ]
 
 [[package]]
