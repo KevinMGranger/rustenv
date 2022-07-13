@@ -18,9 +18,9 @@ use std::{env, io};
 ///
 /// Error codes: 3 if the .env file was not found, 4 if check failed.
 struct Args {
-    #[clap(short = 's', long, default_value = "-x")]
+    #[clap(short = 's', long, default_value = "--export --global")]
     /// Which flags to append to fish's `set`.
-    /// Pass an empty string to not use the default of `-x`.
+    /// Pass an empty string to not use the default.
     set_flags: String,
 
     // TODO: make certain flags mutually exclusive?
