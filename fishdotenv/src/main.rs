@@ -1,5 +1,5 @@
 mod janky_ordered;
-use anyhow::{bail, Error, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use is_terminal::IsTerminal;
 use std::{env, io};
@@ -40,8 +40,8 @@ struct Args {
 
 fn list(vars: impl Iterator<Item = dotenvy::Result<(String, String)>>) -> Result<()> {
     let keys: Vec<String> = vars
-        .map(|r| r.map(|(k, _)| k).map_err(Error::from))
-        .collect::<Result<Vec<String>>>()?;
+        .map(|r| r.map(|(k, _)| k))
+        .collect::<dotenvy::Result<Vec<String>>>()?;
 
     let keys = keys.into_iter().rev().collect::<janky_ordered::Set>();
 
@@ -58,7 +58,7 @@ fn query(
 ) -> Result<()> {
     let keys = vars
         .filter_map(|r| match r {
-            Err(e) => Some(Err(Error::from(e))),
+            Err(e) => Some(Err(e)),
             Ok((key, value)) => {
                 if key == query {
                     Some(Ok(value))
@@ -67,7 +67,7 @@ fn query(
                 }
             }
         })
-        .collect::<Result<Vec<String>>>()?;
+        .collect::<dotenvy::Result<Vec<String>>>()?;
     if let Some(val) = keys.last() {
         println!("{val}");
     } else {
@@ -76,9 +76,7 @@ fn query(
     Ok(())
 }
 fn check(vars: impl Iterator<Item = dotenvy::Result<(String, String)>>) -> Result<()> {
-    let keys = vars
-        .map(|r| r.map_err(Error::from))
-        .collect::<Result<Vec<(String, String)>>>()?;
+    let keys = vars.collect::<dotenvy::Result<Vec<(String, String)>>>()?;
 
     let map = keys.into_iter().rev().collect::<janky_ordered::Map>();
 
