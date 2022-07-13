@@ -35,3 +35,33 @@ end
 
 printf "🇪 %s" $dotenv_status
 ```
+
+To have your .env file loaded whenever you change dirs (but only if the dir is trusted!),
+here are some ideas:
+
+~/.config/fish/conf.d/dotenv.fish
+```fish
+function dotenv_on_trusted_dir --on-variable PWD --description "update variables from .env if the dir is trusted"
+    if not set -q trusted_dotenv_dirs;
+        set --universal --path trusted_dotenv_dirs
+    end
+    if which fishdotenv >/dev/null 2>&1; and contains -- $PWD $trusted_dotenv_dirs
+        fishdotenv | source
+    end
+end
+
+dotenv_on_trusted_dir
+```
+
+~/.config/fish/functions/add_to_trusted_dotenv_dirs.fish
+```fish
+function add_to_trusted_dotenv_dirs --description "Add the current path or given paths to the list of trusted dotenv dirs"
+    if test (count $argv) -eq 0;
+        set --universal --path --append trusted_dotenv_dirs $PWD
+    else
+        set --universal --path --append trusted_dotenv_dirs $argv
+    end
+end
+```
+
+These may be printable in a future version of the program.
