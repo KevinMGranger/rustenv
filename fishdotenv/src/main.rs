@@ -117,12 +117,9 @@ fn fish(
     vars: impl Iterator<Item = dotenvy::Result<(String, String)>>,
     set_flags: String,
 ) -> Result<()> {
-    // TODO: should we always pre-process all lines?
-    // TODO: do we deduplicate for simplicity's sake?
-    // ANSWER: yes, but is that necessary?
-    for item in vars {
-        let (key, val) = item?;
-
+    let items = vars.collect::<dotenvy::Result<Vec<(String, String)>>>()?;
+    let map = items.into_iter().rev().collect::<janky_ordered::Map>();
+    for (key, val) in map.into_iter().rev() {
         let escaped = val.replace('\\', r"\\").replace('\'', r"\'");
         // TODO: document why the escape-unescape dance is necessary.
         // Also test that this actually works.
