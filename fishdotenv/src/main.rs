@@ -1,5 +1,5 @@
 mod janky_ordered;
-use anyhow::{bail, Context, Error, Result};
+use anyhow::{bail, Error, Result};
 use clap::Parser;
 use is_terminal::IsTerminal;
 use std::{env, io};
@@ -38,14 +38,103 @@ struct Args {
     // eval: bool,
 }
 
+fn list(vars: impl Iterator<Item = dotenvy::Result<(String, String)>>) -> Result<()> {
+    let keys: Vec<String> = vars
+        .map(|r| r.map(|(k, _)| k).map_err(Error::from))
+        .collect::<Result<Vec<String>>>()?;
+
+    let keys = keys.into_iter().rev().collect::<janky_ordered::Set>();
+
+    for key in keys.into_iter().rev() {
+        println!("{key}");
+    }
+
+    Ok(())
+}
+
+fn query(
+    vars: impl Iterator<Item = dotenvy::Result<(String, String)>>,
+    query: String,
+) -> Result<()> {
+    let keys = vars
+        .filter_map(|r| match r {
+            Err(e) => Some(Err(Error::from(e))),
+            Ok((key, value)) => {
+                if key == query {
+                    Some(Ok(value))
+                } else {
+                    None
+                }
+            }
+        })
+        .collect::<Result<Vec<String>>>()?;
+    if let Some(val) = keys.last() {
+        println!("{val}");
+    } else {
+        bail!("{query} not found");
+    }
+    Ok(())
+}
+fn check(vars: impl Iterator<Item = dotenvy::Result<(String, String)>>) -> Result<()> {
+    let keys = vars
+        .map(|r| r.map_err(Error::from))
+        .collect::<Result<Vec<(String, String)>>>()?;
+
+    let map = keys.into_iter().rev().collect::<janky_ordered::Map>();
+
+    let mismatches = map
+        .into_iter()
+        .rev()
+        .filter_map(|(k, v)| match env::var(&k) {
+            Ok(actual) => {
+                if *v != actual {
+                    Some((k, v, Some(actual)))
+                } else {
+                    None
+                }
+            }
+            Err(e) => match e {
+                env::VarError::NotPresent => Some((k, v, None)),
+                env::VarError::NotUnicode(_) => panic!("{e}"),
+            },
+        });
+
+    let mut any = false;
+    for (k, v, actual) in mismatches {
+        println!(
+            "{k} is {}, not {v}",
+            actual.as_ref().map(String::as_str).unwrap_or("unset")
+        );
+        any = true;
+    }
+    if any {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+fn fish(
+    vars: impl Iterator<Item = dotenvy::Result<(String, String)>>,
+    set_flags: String,
+) -> Result<()> {
+    // TODO: should we always pre-process all lines?
+    // TODO: do we deduplicate for simplicity's sake?
+    // ANSWER: yes, but is that necessary?
+    for item in vars {
+        let (key, val) = item?;
+
+        let escaped = val.replace('\\', r"\\").replace('\'', r"\'");
+        // TODO: document why the escape-unescape dance is necessary.
+        // Also test that this actually works.
+        println!(
+            "set {set_flags} {key} (string escape '{escaped}' | string unescape | string collect)"
+        );
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
-    let Args {
-        set_flags,
-        list,
-        query,
-        check,
-        // eval,
-    } = Args::parse();
+    let args = Args::parse();
 
     let vars = if io::stdin().is_terminal() {
         match dotenvy::dotenv_iter() {
@@ -59,79 +148,13 @@ fn main() -> Result<()> {
         dotenvy::from_path_iter("/dev/stdin")?
     };
 
-    if list {
-        let keys: Vec<String> = vars
-            .map(|r| r.map(|(k, _)| k).map_err(Error::from))
-            .collect::<Result<Vec<String>>>()?;
-
-        let keys = keys.into_iter().rev().collect::<janky_ordered::Set>();
-
-        for key in keys.into_iter().rev() {
-            println!("{key}");
-        }
-    } else if !query.is_empty() {
-        let keys = vars
-            .filter_map(|r| match r {
-                Err(e) => Some(Err(Error::from(e))),
-                Ok((key, value)) => {
-                    if key == query {
-                        Some(Ok(value))
-                    } else {
-                        None
-                    }
-                }
-            })
-            .collect::<Result<Vec<String>>>()?;
-        if let Some(val) = keys.last() {
-            println!("{val}");
-        } else {
-            bail!("{query} not found");
-        }
-    } else if check {
-        let keys = vars
-            .map(|r| r.map_err(Error::from))
-            .collect::<Result<Vec<(String, String)>>>()?;
-
-        let map = keys.into_iter().rev().collect::<janky_ordered::Map>();
-
-        let mismatches = map
-            .into_iter()
-            .rev()
-            .filter_map(|(k, v)| match env::var(&k) {
-                Ok(actual) => {
-                    if *v != actual {
-                        Some((k, v, Some(actual)))
-                    } else {
-                        None
-                    }
-                }
-                Err(e) => match e {
-                    env::VarError::NotPresent => Some((k, v, None)),
-                    env::VarError::NotUnicode(_) => panic!("{e}"),
-                },
-            });
-
-        let mut any = false;
-        for (k, v, actual) in mismatches {
-            println!(
-                "{k} is {}, not {v}",
-                actual.as_ref().map(String::as_str).unwrap_or("unset")
-            );
-            any = true;
-        }
-        if any {
-            std::process::exit(1);
-        }
+    if args.list {
+        list(vars)
+    } else if !args.query.is_empty() {
+        query(vars, args.query)
+    } else if args.check {
+        check(vars)
     } else {
-        for item in vars {
-            let (key, val) = item?;
-
-            let escaped = val.replace('\\', r"\\").replace('\'', r"\'");
-            // TODO: document why the escape-unescape dance is necessary.
-            // Also test that this actually works.
-            println!("set {set_flags} {key} (string escape '{escaped}' | string unescape | string collect)");
-        }
+        fish(vars, args.set_flags)
     }
-
-    Ok(())
 }
