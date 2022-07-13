@@ -8,12 +8,15 @@ use std::{env, io};
 #[clap(author, version, about)]
 /// Print a dotenv file into a format that the fish shell can `eval`.
 ///
+///
 /// If stdin is not a terminal, it will read from the stdin stream.
 /// If stdin is a terminal, it will read from .env.
 ///
 /// To read from a different file, use shell redirection.
 /// To read from .env when stdin is inherited from a parent,
 /// redirect stdin to /dev/null.
+///
+/// Error codes: 3 if the .env file was not found, 4 if check failed.
 struct Args {
     #[clap(short = 's', long, default_value = "-x")]
     /// Which flags to append to fish's `set`.
@@ -106,7 +109,7 @@ fn check(vars: impl Iterator<Item = dotenvy::Result<(String, String)>>) -> Resul
         any = true;
     }
     if any {
-        std::process::exit(1);
+        std::process::exit(4);
     }
     Ok(())
 }
@@ -135,7 +138,8 @@ fn main() -> Result<()> {
         match dotenvy::dotenv_iter() {
             Ok(i) => i,
             Err(dotenvy::Error::Io(ioe)) if ioe.kind() == io::ErrorKind::NotFound => {
-                bail!("dotenv file not found")
+                eprintln!(".env not found");
+                std::process::exit(3)
             }
             Err(e) => return Err(anyhow::Error::from(e)),
         }
